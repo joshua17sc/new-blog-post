@@ -14,56 +14,71 @@ GITHUB_REPO = os.getenv('GITHUB_REPO')
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 def fetch_top_articles():
-    url = 'https://newsapi.org/v2/everything'
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
-    params = {
-        'q': 'cybersecurity',
-        'from': yesterday,
-        'to': yesterday,
-        'sortBy': 'popularity',
-        'pageSize': 20,
-        'apiKey': NEWS_API_KEY,
-    }
-    response = requests.get(url, params=params)
-    articles = response.json().get('articles', [])
-    return articles
+    try:
+        url = 'https://newsapi.org/v2/everything'
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
+        params = {
+            'q': 'cybersecurity',
+            'from': yesterday,
+            'to': yesterday,
+            'sortBy': 'popularity',
+            'pageSize': 20,
+            'apiKey': NEWS_API_KEY,
+        }
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        articles = response.json().get('articles', [])
+        return articles
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching articles: {e}")
+        return []
 
 def scrape_article_content(url):
-    response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    paragraphs = soup.find_all('p')
-    full_text = ' '.join([para.text for para in paragraphs])
-    return full_text
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+        paragraphs = soup.find_all('p')
+        full_text = ' '.join([para.text for para in paragraphs])
+        return full_text
+    except requests.exceptions.RequestException as e:
+        print(f"Error scraping article content from {url}: {e}")
+        return ""
 
 def summarize_article(article_text):
-    stream = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {
-                "role": "user",
-                "content": f"Acting as a cybersecurity professional, summarize this article for me:\n\n{article_text}"
-            }
-        ],
-        stream=True,
-    )
-    summary = ""
-    for chunk in stream:
-        if chunk.choices[0].delta.content is not None:
-            summary += chunk.choices[0].delta.content
-    return summary
+    try:
+        stream = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Acting as a cybersecurity professional, summarize this article for me:\n\n{article_text}"
+                }
+            ],
+            stream=True,
+        )
+        summary = ""
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                summary += chunk.choices[0].delta.content
+        return summary
+    except Exception as e:
+        print(f"Error summarizing article: {e}")
+        return "Summary unavailable due to an error."
 
 def filter_relevant_articles(articles):
     relevant_articles = []
     for article in articles:
         full_text = scrape_article_content(article['url'])
-        summary = summarize_article(full_text)
-        relevant_articles.append({
-            'title': article['title'],
-            'url': article['url'],
-            'summary': summary
-        })
-        if len(relevant_articles) == 10:
-            break
+        if full_text:
+            summary = summarize_article(full_text)
+            relevant_articles.append({
+                'title': article['title'],
+                'url': article['url'],
+                'summary': summary
+            })
+            if len(relevant_articles) == 10:
+                break
     return relevant_articles
 
 def create_blog_post(summaries):
