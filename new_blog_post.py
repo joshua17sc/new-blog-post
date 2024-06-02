@@ -1,13 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
-import openai
-import json
+from openai import OpenAI
 from datetime import datetime, timedelta, timezone
 import os
 import subprocess
-from openai import OpenAI
-
-client = OpenAI()
 
 # Load API keys from environment variables
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
@@ -15,7 +11,7 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 GITHUB_REPO = os.getenv('GITHUB_REPO')
 
 # Set the API key for OpenAI
-openai.api_key = OPENAI_API_KEY
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def fetch_top_articles():
     url = 'https://newsapi.org/v2/everything'
@@ -40,16 +36,21 @@ def scrape_article_content(url):
     return full_text
 
 def summarize_article(article_text):
-    response = client.completions.create(
+    stream = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {
                 "role": "user",
                 "content": f"Acting as a cybersecurity professional, summarize this article for me:\n\n{article_text}"
             }
-        ]
+        ],
+        stream=True,
     )
-    return response.choices[0].message.content
+    summary = ""
+    for chunk in stream:
+        if chunk.choices[0].delta.content is not None:
+            summary += chunk.choices[0].delta.content
+    return summary
 
 def filter_relevant_articles(articles):
     relevant_articles = []
