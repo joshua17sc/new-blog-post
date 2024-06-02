@@ -4,6 +4,7 @@ from openai import OpenAI
 from datetime import datetime, timedelta, timezone
 import os
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 
 # Load API keys from environment variables
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
@@ -52,7 +53,7 @@ def summarize_article(article_text):
             messages=[
                 {
                     "role": "user",
-                    "content": f"As a cybersecurity professional that is trying to help other cyber professionals understand the latest cybersecurity news, summarize this article, focusing on the most important and relevant point if it includes multiple topics, but not stating that it is the most important and relevant:\n\n{article_text}"
+                    "content": f"As a cybersecurity professional that is trying to help other cyber professionals understand the latest cybersecurity news, summarize this article, focusing on the most important and relevant points:\n\n{article_text}"
                 }
             ],
             stream=True,
@@ -87,19 +88,24 @@ def generate_new_title(summary_text):
         print(f"Error generating new title: {e}")
         return "Title unavailable due to an error."
 
+def process_article(article):
+    full_text = scrape_article_content(article['url'])
+    if full_text:
+        summary = summarize_article(full_text)
+        new_title = generate_new_title(summary)
+        return {
+            'original_title': article['title'],
+            'new_title': new_title,
+            'url': article['url'],
+            'summary': summary
+        }
+    return None
+
 def filter_relevant_articles(articles):
-    summarized_articles = []
-    for article in articles:
-        full_text = scrape_article_content(article['url'])
-        if full_text:
-            summary = summarize_article(full_text)
-            new_title = generate_new_title(summary)
-            summarized_articles.append({
-                'original_title': article['title'],
-                'new_title': new_title,
-                'url': article['url'],
-                'summary': summary
-            })
+    with ThreadPoolExecutor() as executor:
+        processed_articles = list(executor.map(process_article, articles))
+    
+    summarized_articles = [article for article in processed_articles if article is not None]
 
     try:
         # Combine all summarized texts and ask the AI to select the top 10 relevant summaries
