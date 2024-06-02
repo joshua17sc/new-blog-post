@@ -115,7 +115,7 @@ def filter_relevant_articles(articles):
             messages=[
                 {
                     "role": "user",
-                    "content": f"Select the top 10 most relevant articles for a cybersecurity professional from the following summaries:\n\n{combined_summaries}"
+                    "content": f"Select the top 10 most relevant articles for a cybersecurity professional from the following summaries, including removing those that cover multiple news events in a single article:\n\n{combined_summaries}"
                 }
             ],
             stream=True,
