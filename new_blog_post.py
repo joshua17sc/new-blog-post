@@ -5,6 +5,9 @@ import json
 from datetime import datetime, timedelta, timezone
 import os
 import subprocess
+from openai import OpenAI
+
+client = OpenAI()
 
 # Load API keys from environment variables
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
@@ -37,7 +40,7 @@ def scrape_article_content(url):
     return full_text
 
 def summarize_article(article_text):
-    response = openai.Completion.create(
+    response = client.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {
