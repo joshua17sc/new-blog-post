@@ -5,25 +5,20 @@ import json
 from datetime import datetime, timedelta, timezone
 import os
 import subprocess
-from openai import OpenAI
 
-# Load API keys and GitHub token from environment variables
+# Load API keys from environment variables
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
 GITHUB_REPO = os.getenv('GITHUB_REPO')
 
 # Set the API key for OpenAI
 openai.api_key = OPENAI_API_KEY
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-)
 
 def fetch_top_articles():
     url = 'https://newsapi.org/v2/everything'
     yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
     params = {
-       'q': 'cybersecurity',
+        'q': 'cybersecurity',
         'from': yesterday,
         'to': yesterday,
         'sortBy': 'popularity',
@@ -42,23 +37,22 @@ def scrape_article_content(url):
     return full_text
 
 def summarize_article(article_text):
-    response = openai.chat.completions.create(
+    response = openai.Completion.create(
         model="gpt-3.5-turbo",
         messages=[
             {
                 "role": "user",
-                "content": f"Acting as a cybersecurity professional, summarize this article for me:\n\n{article_tex>
+                "content": f"Acting as a cybersecurity professional, summarize this article for me:\n\n{article_text}"
             }
         ]
     )
-    # Extract the last message from the 'assistant'
     return response.choices[0].message.content
 
 def filter_relevant_articles(articles):
     relevant_articles = []
     for article in articles:
         full_text = scrape_article_content(article['url'])
-        summary = summarize_article(full_text)                                                                                 
+        summary = summarize_article(full_text)
         relevant_articles.append({
             'title': article['title'],
             'url': article['url'],
@@ -82,12 +76,11 @@ def create_blog_post(summaries):
             f.write(f"{article['summary']}\n\n")
 
 def push_to_github():
-    repo_url = f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"
-    subprocess.run(["git", "config", "--global", "user.email", "you@example.com"])
-    subprocess.run(["git", "config", "--global", "user.name", "Your Name"])
-    subprocess.run(["git", "add", "."])
-    subprocess.run(["git", "commit", "-m", "Automated update of cybersecurity news"])
-    subprocess.run(["git", "push", repo_url])
+    repo_dir = "../cybersecurity-news"
+    os.chdir(repo_dir)
+    subprocess.run(["git", "add", "."], check=True)
+    subprocess.run(["git", "commit", "-m", "Automated update of cybersecurity news"], check=True)
+    subprocess.run(["git", "push", "origin", "main"], check=True)
 
 if __name__ == "__main__":
     articles = fetch_top_articles()
