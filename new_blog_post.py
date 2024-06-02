@@ -52,7 +52,7 @@ def summarize_article(article_text):
             messages=[
                 {
                     "role": "user",
-                    "content": f"As a cybersecurity professional, summarize this article focusing on the most important and relevant point if it includes multiple topics:\n\n{article_text}"
+                    "content": f"As a cybersecurity professional that is trying to help other cyber professionals understand the latest cybersecurity news, summarize this article, focusing on the most important and relevant point if it includes multiple topics, but not stating that it is the most important and relevant:\n\n{article_text}"
                 }
             ],
             stream=True,
