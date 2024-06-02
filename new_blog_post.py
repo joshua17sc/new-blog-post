@@ -67,19 +67,50 @@ def summarize_article(article_text):
         return "Summary unavailable due to an error."
 
 def filter_relevant_articles(articles):
-    relevant_articles = []
+    full_texts = []
     for article in articles:
         full_text = scrape_article_content(article['url'])
         if full_text:
-            summary = summarize_article(full_text)
-            relevant_articles.append({
+            full_texts.append({
                 'title': article['title'],
                 'url': article['url'],
-                'summary': summary
+                'full_text': full_text
             })
-            if len(relevant_articles) == 10:
-                break
-    return relevant_articles
+    
+    try:
+        # Combine all article texts and ask the AI to select the top 10 relevant articles
+        combined_texts = "\n\n".join([f"Title: {article['title']}\nContent: {article['full_text']}" for article in full_texts])
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Select the top 10 most relevant articles for a cybersecurity professional from the following list:\n\n{combined_texts}"
+                }
+            ],
+            stream=True,
+        )
+        relevant_titles = ""
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                relevant_titles += chunk.choices[0].delta.content
+        
+        relevant_articles = []
+        for article in full_texts:
+            if article['title'] in relevant_titles:
+                summary = summarize_article(article['full_text'])
+                relevant_articles.append({
+                    'title': article['title'],
+                    'url': article['url'],
+                    'summary': summary
+                })
+                if len(relevant_articles) == 10:
+                    break
+
+        return relevant_articles
+    except Exception as e:
+        print(f"Error filtering relevant articles: {e}")
+        return []
 
 def create_blog_post(summaries):
     today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
