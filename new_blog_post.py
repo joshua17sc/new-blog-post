@@ -67,43 +67,39 @@ def summarize_article(article_text):
         return "Summary unavailable due to an error."
 
 def filter_relevant_articles(articles):
-    full_texts = []
+    summarized_articles = []
     for article in articles:
         full_text = scrape_article_content(article['url'])
         if full_text:
-            full_texts.append({
+            summary = summarize_article(full_text)
+            summarized_articles.append({
                 'title': article['title'],
                 'url': article['url'],
-                'full_text': full_text
+                'summary': summary
             })
-    
+
     try:
-        # Combine all article texts and ask the AI to select the top 10 relevant articles
-        combined_texts = "\n\n".join([f"Title: {article['title']}\nContent: {article['full_text']}" for article in full_texts])
+        # Combine all summarized texts and ask the AI to select the top 10 relevant summaries
+        combined_summaries = "\n\n".join([f"Title: {article['title']}\nSummary: {article['summary']}" for article in summarized_articles])
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "user",
-                    "content": f"Select the top 10 most relevant articles for a cybersecurity professional from the following list:\n\n{combined_texts}"
+                    "content": f"Select the top 10 most relevant articles for a cybersecurity professional from the following summaries:\n\n{combined_summaries}"
                 }
             ],
             stream=True,
         )
         relevant_titles = ""
-        for chunk in stream:
+        for chunk in response:
             if chunk.choices[0].delta.content is not None:
                 relevant_titles += chunk.choices[0].delta.content
         
         relevant_articles = []
-        for article in full_texts:
+        for article in summarized_articles:
             if article['title'] in relevant_titles:
-                summary = summarize_article(article['full_text'])
-                relevant_articles.append({
-                    'title': article['title'],
-                    'url': article['url'],
-                    'summary': summary
-                })
+                relevant_articles.append(article)
                 if len(relevant_articles) == 10:
                     break
 
