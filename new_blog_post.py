@@ -79,8 +79,14 @@ def push_to_github():
     repo_dir = "../cybersecurity-news"
     os.chdir(repo_dir)
     subprocess.run(["git", "add", "."], check=True)
-    subprocess.run(["git", "commit", "-m", "Automated update of cybersecurity news"], check=True)
-    subprocess.run(["git", "push", "origin", "main"], check=True)
+    
+    # Check for changes before committing
+    result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+    if result.stdout.strip():
+        subprocess.run(["git", "commit", "-m", "Automated update of cybersecurity news"], check=True)
+        subprocess.run(["git", "push", "origin", "main"], check=True)
+    else:
+        print("No changes to commit.")
 
 if __name__ == "__main__":
     articles = fetch_top_articles()
