@@ -52,7 +52,7 @@ def summarize_article(article_text):
             messages=[
                 {
                     "role": "user",
-                    "content": f"Acting as a cybersecurity professional, summarize this article for me into one to two paragraphs of the most important points of the article:\n\n{article_text}"
+                    "content": f"As a cybersecurity professional, summarize this article focusing on the primary point, especially if it includes multiple unrelated topics:\n\n{article_text}"
                 }
             ],
             stream=True,
@@ -66,21 +66,44 @@ def summarize_article(article_text):
         print(f"Error summarizing article: {e}")
         return "Summary unavailable due to an error."
 
+def generate_new_title(summary_text):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Generate a concise and compelling title for the following summary:\n\n{summary_text}"
+                }
+            ],
+            stream=True,
+        )
+        new_title = ""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                new_title += chunk.choices[0].delta.content
+        return new_title.strip()
+    except Exception as e:
+        print(f"Error generating new title: {e}")
+        return "Title unavailable due to an error."
+
 def filter_relevant_articles(articles):
     summarized_articles = []
     for article in articles:
         full_text = scrape_article_content(article['url'])
         if full_text:
             summary = summarize_article(full_text)
+            new_title = generate_new_title(summary)
             summarized_articles.append({
-                'title': article['title'],
+                'original_title': article['title'],
+                'new_title': new_title,
                 'url': article['url'],
                 'summary': summary
             })
 
     try:
         # Combine all summarized texts and ask the AI to select the top 10 relevant summaries
-        combined_summaries = "\n\n".join([f"Title: {article['title']}\nSummary: {article['summary']}" for article in summarized_articles])
+        combined_summaries = "\n\n".join([f"Title: {article['new_title']}\nSummary: {article['summary']}" for article in summarized_articles])
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -98,7 +121,7 @@ def filter_relevant_articles(articles):
         
         relevant_articles = []
         for article in summarized_articles:
-            if article['title'] in relevant_titles:
+            if article['new_title'] in relevant_titles:
                 relevant_articles.append(article)
                 if len(relevant_articles) == 10:
                     break
@@ -117,7 +140,7 @@ def create_blog_post(summaries):
         f.write(f"date: {today}\n")
         f.write(f"---\n\n")
         for article in summaries:
-            f.write(f"## {article['title']}\n")
+            f.write(f"## {article['new_title']}\n")
             f.write(f"[Read more]({article['url']})\n\n")
             f.write(f"{article['summary']}\n\n")
 
