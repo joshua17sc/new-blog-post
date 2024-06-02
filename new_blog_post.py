@@ -52,7 +52,7 @@ def summarize_article(article_text):
             messages=[
                 {
                     "role": "user",
-                    "content": f"Acting as a cybersecurity professional, summarize this article for me:\n\n{article_text}"
+                    "content": f"Acting as a cybersecurity professional, summarize this article for me into one to two paragraphs of the most important points of the article:\n\n{article_text}"
                 }
             ],
             stream=True,
