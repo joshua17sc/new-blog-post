@@ -63,16 +63,20 @@ def scrape_article_content(url):
 def summarize_article(article_text):
     logging.info("Summarizing article...")
     try:
-        response = client.chat.completions.create(
+        stream = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "user",
                     "content": f"As a cybersecurity professional that is trying to help other cyber professionals understand the latest cybersecurity news, summarize the following article: {article_text}"
                 }
-            ]
+            ],
+            stream=True,
         )
-        summary = response['choices'][0]['message']['content']
+        summary = ""
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                summary += chunk.choices[0].delta.content
         logging.info("Article summarized.")
         return summary
     except Exception as e:
