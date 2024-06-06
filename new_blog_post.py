@@ -6,8 +6,8 @@ from openai import OpenAI
 from datetime import datetime, timedelta, timezone
 import os
 import subprocess
-import logging
 from concurrent.futures import ThreadPoolExecutor
+import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,11 +39,9 @@ def fetch_top_articles():
         articles = response.json().get('articles', [])
         logging.info(f"Fetched {len(articles)} articles.")
         return articles
-    except requests.exceptions.HTTPError as e:
-        logging.error(f"HTTP error fetching articles: {e}")
     except requests.exceptions.RequestException as e:
         logging.error(f"Error fetching articles: {e}")
-    return []
+        return []
 
 def scrape_article_content(url):
     logging.info(f"Scraping content from {url}...")
@@ -55,64 +53,90 @@ def scrape_article_content(url):
         full_text = ' '.join([para.text for para in paragraphs])
         logging.info(f"Scraped content from {url}")
         return full_text
-    except requests.exceptions.HTTPError as e:
-        logging.error(f"HTTP error scraping article: {e}")
     except requests.exceptions.RequestException as e:
-        logging.error(f"Error scraping article: {e}")
-    return ""
+        logging.error(f"Error scraping article content from {url}: {e}")
+        return ""
 
-def summarize_text(text):
-    logging.info("Summarizing text...")
+def summarize_article(article_text):
+    logging.info("Summarizing article...")
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": f"Summarize the following text:\n\n{text}"}
-            ],
-            max_tokens=150
+                {
+                    "role": "user",
+                    "content": f"As a cybersecurity professional that is trying to help other cyber professionals understand the latest cybersecurity news, summarize this article, focusing on the most important and relevant point when an article covers several topics, but without pointing it out as the most important and relevant:\n\n{article_text}"
+                }
+            ]
         )
-        summary = response.choices[0].text.strip()
-        logging.info("Text summarized.")
+        summary = response.choices[0].message['content'].strip()
+        logging.info("Article summarized.")
         return summary
     except Exception as e:
-        logging.error(f"Error summarizing text: {e}")
-    return ""
+        logging.error(f"Error summarizing article: {e}")
+        return "Summary unavailable due to an error."
 
-def filter_relevant_articles(articles, summaries):
-    logging.info("Filtering relevant articles...")
+def generate_new_title(summary_text):
+    logging.info("Generating new title...")
     try:
-        combined_articles = [
-            {
-                "title": article["title"],
-                "url": article["url"],
-                "summary": summaries[idx],
-                "content": summaries[idx]  # Using the summary as content for relevance filtering
-            }
-            for idx, article in enumerate(articles) if summaries[idx]
-        ]
-        
-        combined_text = "\n\n".join([f"Title: {article['title']}\nSummary: {article['summary']}\nContent: {article['content']}" for article in combined_articles])
-
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant specialized in cybersecurity."},
-                {"role": "user", "content": f"Select the 8 most relevant articles for a cybersecurity professional from the following list:\n\n{combined_text}"}
-            ],
-            max_tokens=500
+                {
+                    "role": "user",
+                    "content": f"Generate a concise and compelling title for the following summary:\n\n{summary_text}"
+                }
+            ]
         )
+        new_title = response.choices[0].message['content'].strip()
+        logging.info("New title generated.")
+        return new_title
+    except Exception as e:
+        logging.error(f"Error generating new title: {e}")
+        return "Title unavailable due to an error."
 
-        selected_titles = response.choices[0].text.strip().split('\n')
-        selected_titles = [title.strip() for title in selected_titles if title.strip()]
+def process_article(article):
+    logging.info(f"Processing article: {article['title']}")
+    full_text = scrape_article_content(article['url'])
+    if full_text:
+        summary = summarize_article(full_text)
+        new_title = generate_new_title(summary)
+        return {
+            'original_title': article['title'],
+            'new_title': new_title,
+            'url': article['url'],
+            'summary': summary
+        }
+    return None
 
-        relevant_articles = [article for article in combined_articles if article['title'] in selected_titles]
+def filter_relevant_articles(articles):
+    logging.info("Filtering relevant articles...")
+    with ThreadPoolExecutor() as executor:
+        processed_articles = list(executor.map(process_article, articles))
+    
+    summarized_articles = [article for article in processed_articles if article is not None]
+
+    try:
+        combined_summaries = "\n\n".join([f"Title: {article['new_title']}\nSummary: {article['summary']}" for article in summarized_articles])
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Select the top 8 most relevant articles for a cybersecurity professional from the following summaries, including removing those that cover multiple news events in a single article:\n\n{combined_summaries}"
+                }
+            ]
+        )
+        relevant_titles = response.choices[0].message['content'].strip().split('\n')
+        relevant_titles = [title.strip() for title in relevant_titles if title.strip()]
+
+        relevant_articles = [article for article in summarized_articles if article['new_title'] in relevant_titles]
         
-        logging.info(f"Filtered {len(relevant_articles)} relevant articles.")
+        logging.info(f"Filtered down to {len(relevant_articles)} relevant articles.")
         return relevant_articles
     except Exception as e:
         logging.error(f"Error filtering relevant articles: {e}")
-    return []
+        return []
 
 def create_blog_post(summaries):
     logging.info("Creating blog post...")
@@ -125,7 +149,7 @@ def create_blog_post(summaries):
             f.write(f"date: {today}\n")
             f.write(f"---\n\n")
             for article in summaries:
-                f.write(f"## {article['title']}\n")
+                f.write(f"## {article['new_title']}\n")
                 f.write(f"[Read more]({article['url']})\n\n")
                 f.write(f"{article['summary']}\n\n")
         logging.info("Blog post created.")
@@ -151,9 +175,6 @@ def push_to_github():
 
 if __name__ == "__main__":
     articles = fetch_top_articles()
-    with ThreadPoolExecutor() as executor:
-        article_contents = list(executor.map(scrape_article_content, [article['url'] for article in articles]))
-    summaries = [summarize_text(content) for content in article_contents]
-    relevant_articles = filter_relevant_articles(articles, summaries)
+    relevant_articles = filter_relevant_articles(articles)
     create_blog_post(relevant_articles)
     push_to_github()
