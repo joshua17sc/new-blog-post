@@ -157,7 +157,7 @@ def filter_relevant_articles(articles):
 def create_blog_post(summaries):
     logging.info("Creating blog post...")
     today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-    filename = f"../cybersecurity-news/_posts/{today}-cybersecurity-news.md"
+    filename = f"/root/cybersecurity-news/_posts/{today}-cybersecurity-news.md"
     try:
         with open(filename, 'w') as f:
             f.write(f"---\n")
@@ -174,7 +174,7 @@ def create_blog_post(summaries):
 
 def push_to_github():
     logging.info("Pushing to GitHub...")
-    repo_dir = "../cybersecurity-news"
+    repo_dir = "/root/cybersecurity-news"
     os.chdir(repo_dir)
     try:
         subprocess.run(["git", "add", "."], check=True)
