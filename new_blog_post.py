@@ -64,9 +64,12 @@ def scrape_article_content(url):
 def summarize_text(text):
     logging.info("Summarizing text...")
     try:
-        response = client.Completion.create(
-            engine="davinci",
-            prompt=f"Summarize the following text:\n\n{text}",
+        response = client.chat_completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": f"Summarize the following text:\n\n{text}"}
+            ],
             max_tokens=150
         )
         summary = response.choices[0].text.strip()
@@ -91,9 +94,12 @@ def filter_relevant_articles(articles, summaries):
         
         combined_text = "\n\n".join([f"Title: {article['title']}\nSummary: {article['summary']}\nContent: {article['content']}" for article in combined_articles])
 
-        response = client.Completion.create(
-            engine="davinci",
-            prompt=f"Select the 8 most relevant articles for a cybersecurity professional from the following list:\n\n{combined_text}",
+        response = client.chat_completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant specialized in cybersecurity."},
+                {"role": "user", "content": f"Select the 8 most relevant articles for a cybersecurity professional from the following list:\n\n{combined_text}"}
+            ],
             max_tokens=500
         )
 
