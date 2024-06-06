@@ -60,16 +60,20 @@ def scrape_article_content(url):
 def summarize_article(article_text):
     logging.info("Summarizing article...")
     try:
-        response = client.chat.completions.create(
+        stream = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "user",
                     "content": f"As a cybersecurity professional that is trying to help other cyber professionals understand the latest cybersecurity news, summarize this article, focusing on the most important and relevant point when an article covers several topics, but without pointing it out as the most important and relevant:\n\n{article_text}"
                 }
-            ]
+            ],
+            stream=True,
         )
-        summary = response.choices[0].message['content'].strip()
+        summary = ""
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                summary += chunk.choices[0].delta.content
         logging.info("Article summarized.")
         return summary
     except Exception as e:
@@ -86,11 +90,15 @@ def generate_new_title(summary_text):
                     "role": "user",
                     "content": f"Generate a concise and compelling title for the following summary:\n\n{summary_text}"
                 }
-            ]
+            ],
+            stream=True,
         )
-        new_title = response.choices[0].message['content'].strip()
+        new_title = ""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                new_title += chunk.choices[0].delta.content
         logging.info("New title generated.")
-        return new_title
+        return new_title.strip()
     except Exception as e:
         logging.error(f"Error generating new title: {e}")
         return "Title unavailable due to an error."
@@ -125,13 +133,21 @@ def filter_relevant_articles(articles):
                     "role": "user",
                     "content": f"Select the top 8 most relevant articles for a cybersecurity professional from the following summaries, including removing those that cover multiple news events in a single article:\n\n{combined_summaries}"
                 }
-            ]
+            ],
+            stream=True,
         )
-        relevant_titles = response.choices[0].message['content'].strip().split('\n')
-        relevant_titles = [title.strip() for title in relevant_titles if title.strip()]
+        relevant_titles = ""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                relevant_titles += chunk.choices[0].delta.content
 
-        relevant_articles = [article for article in summarized_articles if article['new_title'] in relevant_titles]
-        
+        relevant_articles = []
+        for article in summarized_articles:
+            if article['new_title'] in relevant_titles:
+                relevant_articles.append(article)
+                if len(relevant_articles) == 8:
+                    break
+
         logging.info(f"Filtered down to {len(relevant_articles)} relevant articles.")
         return relevant_articles
     except Exception as e:
