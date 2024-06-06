@@ -64,7 +64,7 @@ def scrape_article_content(url):
 def summarize_text(text):
     logging.info("Summarizing text...")
     try:
-        response = client.chat_completions.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
@@ -94,7 +94,7 @@ def filter_relevant_articles(articles, summaries):
         
         combined_text = "\n\n".join([f"Title: {article['title']}\nSummary: {article['summary']}\nContent: {article['content']}" for article in combined_articles])
 
-        response = client.chat_completions.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant specialized in cybersecurity."},
