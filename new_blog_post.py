@@ -15,7 +15,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Load API keys from environment variables
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-GITHUB_REPO = os.getenv('GITHUB_REPO')
 
 # Set the API key for OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY)
