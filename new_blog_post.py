@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 import requests
-from bs4 import BeautifulSoup
-from openai import OpenAI
+from bs4 import BeautifulSoup # type: ignore
+from openai import OpenAI # type: ignore
 from datetime import datetime, timedelta, timezone
 import os
 import subprocess
